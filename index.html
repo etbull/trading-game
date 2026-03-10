@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OPEN OUTCRY — Market Making Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111111;
+    --border: #222222;
+    --green: #00ff88;
+    --red: #ff3355;
+    --gold: #ffd166;
+    --blue: #4d9de0;
+    --text: #e8e8e8;
+    --muted: #555;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --display: 'Bebas Neue', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TICKER TAPE ── */
+  .ticker-bar {
+    background: var(--green);
+    color: #000;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    letter-spacing: 0.05em;
+  }
+  .ticker-inner {
+    display: inline-block;
+    animation: ticker 30s linear infinite;
+  }
+  @keyframes ticker {
+    0% { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-size: 32px;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .logo span { color: var(--text); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .timer-display {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    min-width: 80px;
+    text-align: right;
+  }
+  .timer-display.urgent { color: var(--red); animation: pulse 0.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* ── LOBBY ── */
+  #lobby {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 100px);
+    padding: 40px;
+  }
+
+  .lobby-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 520px;
+    padding: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .lobby-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--green));
+  }
+
+  .lobby-title {
+    font-family: var(--display);
+    font-size: 48px;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .lobby-sub {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 40px;
+  }
+
+  .field-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: #181818;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 24px;
+  }
+  input[type="text"]:focus { border-color: var(--gold); }
+
+  .diff-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .diff-btn {
+    flex: 1;
+    padding: 10px;
+    background: #181818;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .diff-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .diff-btn.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
+
+  .start-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--gold);
+    color: #000;
+    font-family: var(--display);
+    font-size: 24px;
+    letter-spacing: 0.15em;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .start-btn:hover { background: #fff; transform: translateY(-1px); }
+  .start-btn:active { transform: translateY(0); }
+
+  .bot-preview {
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
+  .bot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .bot-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .bot-row .bot-name { color: var(--text); }
+  .bot-type-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    background: #181818;
+    border: 1px solid var(--border);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── GAME LAYOUT ── */
+  #game { display: none; padding: 0; }
+
+  .market-banner {
+    background: linear-gradient(135deg, #111 0%, #161616 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .market-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .market-question {
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+  .diff-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .game-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr 280px;
+    gap: 0;
+    height: calc(100vh - 168px);
+  }
+
+  .panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel:last-child { border-right: none; }
+
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  /* ── ORDER BOOK ── */
+  .book-section {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .book-ask, .book-bid {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .book-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    padding: 6px 16px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid #1a1a1a;
+    background: var(--panel);
+    position: sticky;
+    top: 0;
+  }
+
+  .book-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    padding: 5px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+    position: relative;
+    align-items: center;
+    gap: 0;
+  }
+  .book-row:hover { background: #1c1c1c; }
+  .book-row.player-order { background: #1a1800; }
+  .book-row.player-order:hover { background: #221f00; }
+
+  .book-row .price { font-weight: 700; }
+  .book-row.ask-row .price { color: var(--red); }
+  .book-row.bid-row .price { color: var(--green); }
+  .book-row .qty { text-align: right; color: var(--muted); }
+  .book-row .owner { text-align: right; font-size: 10px; color: #444; }
+
+  .book-depth-bar {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .ask-row .book-depth-bar { background: var(--red); }
+  .bid-row .book-depth-bar { background: var(--green); }
+
+  .spread-row {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: #0e0e0e;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .spread-mid { color: var(--gold); font-weight: 700; font-size: 18px; }
+
+  /* ── ORDER ENTRY ── */
+  .order-entry {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .side-toggle {
+    display: flex;
+    margin-bottom: 12px;
+    gap: 0;
+  }
+  .side-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: #181818;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--muted);
+  }
+  .side-btn.bid-btn { border-right: none; }
+  .side-btn.bid-btn.active { background: rgba(0,255,136,0.15); border-color: var(--green); color: var(--green); }
+  .side-btn.ask-btn.active { background: rgba(255,51,85,0.15); border-color: var(--red); color: var(--red); }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .num-input-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .num-input-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  input[type="number"] {
+    width: 100%;
+    background: #181818;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: var(--gold); }
+
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    font-family: var(--display);
+    font-size: 20px;
+    letter-spacing: 0.1em;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 4px;
+  }
+  .submit-btn.bid-active { background: var(--green); color: #000; }
+  .submit-btn.ask-active { background: var(--red); color: #fff; }
+  .submit-btn:hover { filter: brightness(1.1); }
+
+  /* ── MIDDLE: TRADES + POSITIONS ── */
+  .middle-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .trade-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-bottom: 1px solid #161616;
+    font-family: var(--mono);
+    font-size: 11px;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+  .trade-price { font-weight: 700; font-size: 13px; min-width: 70px; }
+  .trade-qty { color: var(--muted); min-width: 40px; }
+  .trade-parties { color: #444; font-size: 10px; flex: 1; }
+  .trade-time { color: #333; font-size: 10px; }
+  .trade-row.player-trade .trade-price { color: var(--gold); }
+
+  /* ── LEADERBOARD / POSITIONS ── */
+  .positions-panel { overflow-y: auto; }
+
+  .position-row {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 16px;
+    border-bottom: 1px solid #161616;
+    gap: 4px;
+    transition: background 0.15s;
+  }
+  .position-row.player-pos { background: #131200; }
+  .position-row:hover { background: #161616; }
+
+  .pos-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pos-name {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pos-pnl {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pos-pnl.positive { color: var(--green); }
+  .pos-pnl.negative { color: var(--red); }
+  .pos-pnl.neutral { color: var(--muted); }
+
+  .pos-details {
+    display: flex;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .pos-details span.positive { color: var(--green); }
+  .pos-details span.negative { color: var(--red); }
+
+  /* ── END SCREEN ── */
+  #endscreen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .end-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 580px;
+    padding: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .end-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--red), var(--gold), var(--green));
+  }
+
+  .end-title {
+    font-family: var(--display);
+    font-size: 56px;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .end-answer {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 32px;
+  }
+  .end-answer strong { color: var(--gold); }
+
+  .end-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .end-table th {
+    text-align: left;
+    padding: 6px 12px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .end-table th:last-child { text-align: right; }
+  .end-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #191919;
+  }
+  .end-table td:last-child { text-align: right; font-weight: 700; }
+  .end-table tr.player-end { background: #131200; }
+  .end-table tr.rank-1 td:first-child::before { content: '🥇 '; }
+  .end-table tr.rank-2 td:first-child::before { content: '🥈 '; }
+  .end-table tr.rank-3 td:first-child::before { content: '🥉 '; }
+
+  .replay-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--gold);
+    color: #000;
+    font-family: var(--display);
+    font-size: 24px;
+    letter-spacing: 0.15em;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .replay-btn:hover { background: #fff; }
+
+  /* ── NOTIFICATION TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    padding: 12px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    z-index: 200;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.25s;
+    pointer-events: none;
+    max-width: 280px;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { border-left-color: var(--red); }
+  #toast.success { border-left-color: var(--green); }
+
+  /* ── MY ORDERS ── */
+  .my-orders-section {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .my-order-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-bottom: 1px solid #161616;
+    gap: 8px;
+  }
+  .my-order-row .mo-side { font-weight: 700; min-width: 28px; }
+  .my-order-row .mo-side.bid { color: var(--green); }
+  .my-order-row .mo-side.ask { color: var(--red); }
+  .mo-cancel {
+    background: none;
+    border: 1px solid #333;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .mo-cancel:hover { border-color: var(--red); color: var(--red); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  @media (max-width: 900px) {
+    .game-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
+    .panel { max-height: 400px; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="ticker-bar">
+  <span class="ticker-inner" id="tickerText">
+    OPEN OUTCRY TRADING SIMULATOR &nbsp;·&nbsp; BID LOW, ASK HIGH, MAKE THE SPREAD &nbsp;·&nbsp; BOTS ARE WATCHING &nbsp;·&nbsp; GOOD LUCK TRADER &nbsp;·&nbsp;
+  </span>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">OPEN<span>OUTCRY</span></div>
+  <div class="header-right">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;line-height:1.6;" id="playerStats" style="display:none"></div>
+    <div class="timer-display" id="timerDisplay">5:00</div>
+  </div>
+</header>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="lobby-title">MAKE<br>THE MARKET</div>
+    <div class="lobby-sub">// open outcry trading simulator v1.0</div>
+
+    <label class="field-label">your trader name</label>
+    <input type="text" id="playerName" placeholder="e.g. Trader Joe" value="Trader" />
+
+    <label class="field-label">difficulty</label>
+    <div class="diff-group">
+      <button class="diff-btn" data-diff="easy" onclick="setDiff('easy')">EASY</button>
+      <button class="diff-btn active" data-diff="medium" onclick="setDiff('medium')">MEDIUM</button>
+      <button class="diff-btn" data-diff="hard" onclick="setDiff('hard')">HARD</button>
+    </div>
+
+    <button class="start-btn" onclick="startGame()">START TRADING</button>
+
+    <div class="bot-preview">
+      <span class="field-label">bots you'll trade against</span>
+      <div class="bot-list">
+        <div class="bot-row"><span class="bot-name">🎲 Chaos Carl</span><span class="bot-type-badge">RANDOM</span></div>
+        <div class="bot-row"><span class="bot-name">🐂 Bullish Brenda</span><span class="bot-type-badge">BULLISH</span></div>
+        <div class="bot-row"><span class="bot-name">😰 Scared Steve</span><span class="bot-type-badge">SCARED</span></div>
+        <div class="bot-row"><span class="bot-name">🧠 Smart Sam</span><span class="bot-type-badge">SMART</span></div>
+        <div class="bot-row"><span class="bot-name">🦊 Sneaky Sanjay</span><span class="bot-type-badge">SMART+</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="market-banner">
+    <div>
+      <div class="market-label">market question</div>
+      <div class="market-question" id="marketQuestion">—</div>
+    </div>
+    <div class="diff-badge" id="diffBadge">MEDIUM</div>
+  </div>
+
+  <div class="game-grid">
+    <!-- LEFT: ORDER BOOK -->
+    <div class="panel" style="flex-direction:column;overflow:hidden;">
+      <div class="panel-header">
+        <span>Order Book</span>
+        <span style="color:#333;font-size:9px;">CLICK TO TAKE</span>
+      </div>
+
+      <div class="book-section" style="overflow-y:auto;flex:1;">
+        <div class="book-header" style="color:var(--red);">
+          <span>ASKS (SELL)</span><span style="text-align:right;">SIZE</span><span style="text-align:right;">WHO</span>
+        </div>
+        <div id="askRows"></div>
+
+        <div class="spread-row">
+          <span>SPREAD</span>
+          <span class="spread-mid" id="spreadMid">—</span>
+          <span id="spreadVal">—</span>
+        </div>
+
+        <div class="book-header" style="color:var(--green);">
+          <span>BIDS (BUY)</span><span style="text-align:right;">SIZE</span><span style="text-align:right;">WHO</span>
+        </div>
+        <div id="bidRows"></div>
+      </div>
+
+      <!-- ORDER ENTRY -->
+      <div class="order-entry">
+        <div class="side-toggle">
+          <button class="side-btn bid-btn active" id="bidBtn" onclick="setSide('bid')">BID</button>
+          <button class="side-btn ask-btn" id="askBtn" onclick="setSide('ask')">ASK</button>
+        </div>
+        <div class="input-row">
+          <div class="num-input-wrap">
+            <div class="num-input-label">Price</div>
+            <input type="number" id="priceInput" placeholder="0.00" step="0.01" min="0" />
+          </div>
+          <div class="num-input-wrap">
+            <div class="num-input-label">Qty</div>
+            <input type="number" id="qtyInput" placeholder="1" min="1" max="20" value="1" />
+          </div>
+        </div>
+        <button class="submit-btn bid-active" id="submitBtn" onclick="placeOrder()">PLACE BID</button>
+      </div>
+
+      <!-- MY ORDERS -->
+      <div class="my-orders-section">
+        <div class="panel-header">
+          <span>My Open Orders</span>
+          <span id="myOrderCount" style="color:var(--gold)">0</span>
+        </div>
+        <div id="myOrders" style="max-height:120px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- MIDDLE: TRADE TAPE -->
+    <div class="panel middle-panel">
+      <div class="panel-header">
+        <span>Trade Tape</span>
+        <span id="tradeCount" style="color:var(--muted)">0 trades</span>
+      </div>
+      <div id="tradeTape" style="overflow-y:auto;flex:1;"></div>
+    </div>
+
+    <!-- RIGHT: LEADERBOARD -->
+    <div class="panel positions-panel">
+      <div class="panel-header">
+        <span>Positions &amp; PnL</span>
+      </div>
+      <div id="positionsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- END SCREEN -->
+<div id="endscreen">
+  <div class="end-card">
+    <div class="end-title" id="endTitle">TIME'S UP</div>
+    <div class="end-answer" id="endAnswer"></div>
+    <table class="end-table">
+      <thead>
+        <tr>
+          <th>Trader</th>
+          <th>Position</th>
+          <th>Cash</th>
+          <th>Final PnL</th>
+        </tr>
+      </thead>
+      <tbody id="endTableBody"></tbody>
+    </table>
+    <button class="replay-btn" onclick="resetToLobby()">TRADE AGAIN</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let selectedSide = 'bid';
+let selectedDiff = 'medium';
+let pollInterval = null;
+let lastTradeCount = 0;
+let tradeTimestamps = {};
+let gameEnded = false;
+
+// ── LOBBY ──────────────────────────────────────────────────────────────────
+function setDiff(d) {
+  selectedDiff = d;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-diff="${d}"]`).classList.add('active');
+}
+
+async function startGame() {
+  const name = document.getElementById('playerName').value.trim() || 'Trader';
+  try {
+    const res = await fetch(`${API}/start`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ player_name: name, difficulty: selectedDiff })
+    });
+    const data = await res.json();
+    if (data.status === 'started') {
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('game').style.display = 'block';
+      document.getElementById('marketQuestion').textContent = data.market_question;
+      document.getElementById('diffBadge').textContent = selectedDiff.toUpperCase();
+      gameEnded = false;
+      lastTradeCount = 0;
+      tradeTimestamps = {};
+      pollInterval = setInterval(pollState, 600);
+      pollState();
+    }
+  } catch(e) {
+    showToast('Cannot connect to server. Is server.py running on port 5000?', 'error');
+  }
+}
+
+// ── GAME LOGIC ─────────────────────────────────────────────────────────────
+function setSide(side) {
+  selectedSide = side;
+  document.getElementById('bidBtn').classList.toggle('active', side === 'bid');
+  document.getElementById('askBtn').classList.toggle('active', side === 'ask');
+  const btn = document.getElementById('submitBtn');
+  if (side === 'bid') {
+    btn.textContent = 'PLACE BID';
+    btn.className = 'submit-btn bid-active';
+  } else {
+    btn.textContent = 'PLACE ASK';
+    btn.className = 'submit-btn ask-active';
+  }
+}
+
+async function placeOrder() {
+  const price = parseFloat(document.getElementById('priceInput').value);
+  const qty = parseInt(document.getElementById('qtyInput').value) || 1;
+  if (!price || price <= 0) { showToast('Enter a valid price', 'error'); return; }
+
+  try {
+    const res = await fetch(`${API}/order`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ side: selectedSide, price, qty })
+    });
+    const data = await res.json();
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      const msg = data.fills > 0
+        ? `✓ Filled ${data.fills} trade${data.fills>1?'s':''}!`
+        : `✓ Order resting in book`;
+      showToast(msg, 'success');
+    }
+    pollState();
+  } catch(e) { showToast('Connection error', 'error'); }
+}
+
+async function takeOrder(orderId, side, price, qty) {
+  try {
+    const res = await fetch(`${API}/take`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ order_id: orderId })
+    });
+    const data = await res.json();
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast(`✓ Filled @ ${data.price} × ${data.qty}`, 'success');
+    }
+    pollState();
+  } catch(e) { showToast('Connection error', 'error'); }
+}
+
+async function cancelOrder(orderId) {
+  try {
+    const res = await fetch(`${API}/cancel`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ order_id: orderId })
+    });
+    const data = await res.json();
+    if (data.error) showToast(data.error, 'error');
+    else showToast('Order cancelled', 'success');
+    pollState();
+  } catch(e) {}
+}
+
+// ── STATE POLLING ──────────────────────────────────────────────────────────
+async function pollState() {
+  try {
+    const res = await fetch(`${API}/state`);
+    const data = await res.json();
+    if (!data.active && !data.remaining && !data.market_question) return;
+    updateUI(data);
+    if (!data.active && !gameEnded) {
+      gameEnded = true;
+      clearInterval(pollInterval);
+      setTimeout(() => showEndScreen(data), 1200);
+    }
+  } catch(e) {}
+}
+
+function updateUI(data) {
+  // Timer
+  const rem = data.remaining || 0;
+  const m = Math.floor(rem / 60);
+  const s = Math.floor(rem % 60);
+  const timerEl = document.getElementById('timerDisplay');
+  timerEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  timerEl.className = 'timer-display' + (rem < 30 ? ' urgent' : '');
+
+  // Order book
+  renderBook(data.order_book || {bids:[], asks:[]});
+
+  // Trades
+  renderTrades(data.trades || []);
+
+  // Positions
+  renderPositions(data.players || {});
+
+  // Player stats header
+  const player = (data.players || {})['player'];
+  if (player) {
+    const pnl = player.pnl || 0;
+    document.getElementById('playerStats').innerHTML =
+      `<span style="color:var(--muted)">CASH</span> <span style="color:var(--text)">${player.cash.toFixed(0)}</span>&nbsp;&nbsp;<span style="color:var(--muted)">POS</span> <span style="${player.position>0?'color:var(--green)':player.position<0?'color:var(--red)':'color:var(--muted)'}">${player.position>0?'+':''}${player.position}</span>&nbsp;&nbsp;<span style="color:var(--muted)">PnL</span> <span style="${pnl>0?'color:var(--green)':pnl<0?'color:var(--red)':'color:var(--muted)'}">${pnl>0?'+':''}${pnl.toFixed(0)}</span>`;
+    document.getElementById('playerStats').style.display = 'block';
+  }
+}
+
+function renderBook(book) {
+  const bids = book.bids || [];
+  const asks = book.asks || [];
+  const maxQty = Math.max(...[...bids,...asks].map(o=>o.qty), 1);
+
+  // Asks (displayed reversed - lowest ask at bottom near spread)
+  const asksSorted = [...asks].sort((a,b) => b.price - a.price);
+  document.getElementById('askRows').innerHTML = asksSorted.map(o => {
+    const isPlayer = o.owner_id === 'player';
+    const barW = (o.qty / maxQty * 100).toFixed(1);
+    return `<div class="book-row ask-row ${isPlayer?'player-order':''}" onclick="takeOrder('${o.id}','ask',${o.price},${o.qty})" title="Click to BUY @ ${o.price}">
+      <div class="book-depth-bar" style="width:${barW}%"></div>
+      <span class="price">${formatPrice(o.price)}</span>
+      <span class="qty">${o.qty}</span>
+      <span class="owner">${isPlayer?'YOU':shortName(o.owner_name)}</span>
+    </div>`;
+  }).join('');
+
+  // Spread display
+  const bestBid = bids.length ? Math.max(...bids.map(o=>o.price)) : null;
+  const bestAsk = asks.length ? Math.min(...asks.map(o=>o.price)) : null;
+  const mid = (bestBid && bestAsk) ? ((bestBid + bestAsk)/2).toFixed(2) : '—';
+  const spread = (bestBid && bestAsk) ? (bestAsk - bestBid).toFixed(2) : '—';
+  document.getElementById('spreadMid').textContent = mid;
+  document.getElementById('spreadVal').textContent = spread !== '—' ? `Δ ${spread}` : '';
+
+  // Bids
+  const bidsSorted = [...bids].sort((a,b) => b.price - a.price);
+  document.getElementById('bidRows').innerHTML = bidsSorted.map(o => {
+    const isPlayer = o.owner_id === 'player';
+    const barW = (o.qty / maxQty * 100).toFixed(1);
+    return `<div class="book-row bid-row ${isPlayer?'player-order':''}" onclick="takeOrder('${o.id}','bid',${o.price},${o.qty})" title="Click to SELL @ ${o.price}">
+      <div class="book-depth-bar" style="width:${barW}%"></div>
+      <span class="price">${formatPrice(o.price)}</span>
+      <span class="qty">${o.qty}</span>
+      <span class="owner">${isPlayer?'YOU':shortName(o.owner_name)}</span>
+    </div>`;
+  }).join('');
+
+  // My open orders
+  const myBids = bids.filter(o=>o.owner_id==='player');
+  const myAsks = asks.filter(o=>o.owner_id==='player');
+  const myOrders = [...myBids.map(o=>({...o,side:'bid'})), ...myAsks.map(o=>({...o,side:'ask'}))];
+  document.getElementById('myOrderCount').textContent = myOrders.length;
+  document.getElementById('myOrders').innerHTML = myOrders.length === 0
+    ? `<div style="padding:8px 16px;font-family:var(--mono);font-size:11px;color:#333;">No open orders</div>`
+    : myOrders.map(o => `<div class="my-order-row">
+        <span class="mo-side ${o.side}">${o.side.toUpperCase()}</span>
+        <span style="font-family:var(--mono);font-size:11px;">${formatPrice(o.price)} × ${o.qty}</span>
+        <button class="mo-cancel" onclick="cancelOrder('${o.id}')">×</button>
+      </div>`).join('');
+}
+
+function renderTrades(trades) {
+  const newCount = trades.length;
+  document.getElementById('tradeCount').textContent = `${newCount} trade${newCount!==1?'s':''}`;
+
+  const tape = document.getElementById('tradeTape');
+  const html = [...trades].map(t => {
+    const isPlayer = t.buyer_id === 'player' || t.seller_id === 'player';
+    const ts = t.timestamp ? new Date(t.timestamp * 1000).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+    return `<div class="trade-row ${isPlayer?'player-trade':''}">
+      <span class="trade-price" style="color:${isPlayer?'var(--gold)':'var(--text)'}">${formatPrice(t.price)}</span>
+      <span class="trade-qty">×${t.qty}</span>
+      <span class="trade-parties">${shortName(t.buyer_name)} ← ${shortName(t.seller_name)}</span>
+      <span class="trade-time">${ts}</span>
+    </div>`;
+  }).join('');
+  tape.innerHTML = html;
+}
+
+function renderPositions(players) {
+  const sorted = Object.entries(players).sort((a,b) => (b[1].pnl||0) - (a[1].pnl||0));
+  document.getElementById('positionsList').innerHTML = sorted.map(([pid, p]) => {
+    const isPlayer = pid === 'player';
+    const pnl = p.pnl || 0;
+    const pnlClass = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral';
+    const posClass = p.position > 0 ? 'positive' : p.position < 0 ? 'negative' : '';
+    const botInfo = pid !== 'player' ? getBotInfo(pid) : null;
+    const emoji = botInfo ? botInfo.emoji : '👤';
+    return `<div class="position-row ${isPlayer?'player-pos':''}">
+      <div class="pos-name-row">
+        <div class="pos-name">${emoji} ${isPlayer?'<strong>YOU</strong>':p.name}</div>
+        <div class="pos-pnl ${pnlClass}">${pnl>0?'+':''}${pnl.toFixed(0)}</div>
+      </div>
+      <div class="pos-details">
+        <span>Cash: ${p.cash.toFixed(0)}</span>
+        <span class="${posClass}">Pos: ${p.position>0?'+':''}${p.position}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getBotInfo(botId) {
+  const bots = {
+    'bot_random':  {emoji:'🎲'},
+    'bot_bullish': {emoji:'🐂'},
+    'bot_scared':  {emoji:'😰'},
+    'bot_smart':   {emoji:'🧠'},
+    'bot_smart2':  {emoji:'🦊'},
+  };
+  return bots[botId] || {emoji:'🤖'};
+}
+
+// ── END SCREEN ─────────────────────────────────────────────────────────────
+function showEndScreen(data) {
+  const players = data.players || {};
+  const sorted = Object.entries(players).sort((a,b) => (b[1].pnl||0) - (a[1].pnl||0));
+
+  document.getElementById('endAnswer').innerHTML =
+    `True answer: <strong>${data.true_answer?.toLocaleString()} ${data.unit || ''}</strong>`;
+
+  const playerRank = sorted.findIndex(([pid]) => pid === 'player') + 1;
+  const titles = ['','FIRST PLACE!','RUNNER UP','NOT BAD...','...',];
+  document.getElementById('endTitle').textContent = titles[playerRank] || 'GAME OVER';
+  document.getElementById('endTitle').style.color =
+    playerRank===1?'var(--gold)':playerRank===2?'var(--text)':'var(--muted)';
+
+  document.getElementById('endTableBody').innerHTML = sorted.map(([pid, p], i) => {
+    const isPlayer = pid === 'player';
+    const pnl = p.pnl || 0;
+    const pnlColor = pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--muted)';
+    return `<tr class="${isPlayer?'player-end':''} rank-${i+1}">
+      <td>${isPlayer?'<strong>YOU</strong>':p.name}</td>
+      <td>${p.position>0?'+':''}${p.position}</td>
+      <td>${p.cash.toFixed(0)}</td>
+      <td style="color:${pnlColor}">${pnl>0?'+':''}${pnl.toFixed(0)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('endscreen').style.display = 'flex';
+}
+
+function resetToLobby() {
+  clearInterval(pollInterval);
+  fetch(`${API}/stop`, {method:'POST'}).catch(()=>{});
+  document.getElementById('endscreen').style.display = 'none';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('lobby').style.display = 'flex';
+  document.getElementById('playerStats').style.display = 'none';
+  document.getElementById('timerDisplay').textContent = '5:00';
+  document.getElementById('timerDisplay').className = 'timer-display';
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function formatPrice(p) {
+  if (p >= 1000000) return (p/1000000).toFixed(2)+'M';
+  if (p >= 1000) return (p/1000).toFixed(1)+'k';
+  return p.toFixed(2);
+}
+
+function shortName(name) {
+  if (!name) return '?';
+  const parts = name.split(' ');
+  return parts.length > 1 ? parts[0][0]+'.'+parts[1] : name.substring(0,8);
+}
+
+let toastTimeout;
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => { t.className = ''; }, 2800);
+}
+
+// Keyboard shortcut: Enter to submit order
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('game').style.display !== 'none') {
+    const active = document.activeElement;
+    if (active.id === 'priceInput' || active.id === 'qtyInput') {
+      placeOrder();
+    }
+  }
+  if (e.key === 'b' || e.key === 'B') {
+    if (document.getElementById('game').style.display !== 'none' && document.activeElement.tagName !== 'INPUT') {
+      setSide('bid'); document.getElementById('priceInput').focus();
+    }
+  }
+  if (e.key === 'a' || e.key === 'A') {
+    if (document.getElementById('game').style.display !== 'none' && document.activeElement.tagName !== 'INPUT') {
+      setSide('ask'); document.getElementById('priceInput').focus();
+    }
+  }
+});
+</script>
+</body>
+</html>
