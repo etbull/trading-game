@@ -838,6 +838,8 @@ async function startGame() {
       gameEnded = false;
       lastTradeCount = 0;
       tradeTimestamps = {};
+      knownTradeIds = new Set();
+      document.getElementById('tradeTape').innerHTML = '';
       pollInterval = setInterval(pollState, 600);
       pollState();
     }
@@ -931,6 +933,11 @@ async function pollState() {
   } catch(e) {}
 }
 
+function isUserTyping() {
+  const a = document.activeElement;
+  return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+}
+
 function updateUI(data) {
   // Timer
   const rem = data.remaining || 0;
@@ -940,14 +947,14 @@ function updateUI(data) {
   timerEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
   timerEl.className = 'timer-display' + (rem < 30 ? ' urgent' : '');
 
-  // Order book
-  renderBook(data.order_book || {bids:[], asks:[]});
+  // Order book + positions: skip if user is typing to avoid focus steal
+  if (!isUserTyping()) {
+    renderBook(data.order_book || {bids:[], asks:[]});
+    renderPositions(data.players || {});
+  }
 
-  // Trades
+  // Trades: safe to always update (only prepends new rows, no full re-render)
   renderTrades(data.trades || []);
-
-  // Positions
-  renderPositions(data.players || {});
 
   // Player stats header
   const player = (data.players || {})['player'];
@@ -1012,22 +1019,34 @@ function renderBook(book) {
       </div>`).join('');
 }
 
+let knownTradeIds = new Set();
+
 function renderTrades(trades) {
   const newCount = trades.length;
   document.getElementById('tradeCount').textContent = `${newCount} trade${newCount!==1?'s':''}`;
 
   const tape = document.getElementById('tradeTape');
-  const html = [...trades].map(t => {
+
+  // Find trades we haven't rendered yet
+  const newTrades = trades.filter(t => !knownTradeIds.has(t.id));
+  if (newTrades.length === 0) return; // Nothing changed, don't touch the DOM
+
+  newTrades.forEach(t => {
+    knownTradeIds.add(t.id);
     const isPlayer = t.buyer_id === 'player' || t.seller_id === 'player';
     const ts = t.timestamp ? new Date(t.timestamp * 1000).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
-    return `<div class="trade-row ${isPlayer?'player-trade':''}">
+    const div = document.createElement('div');
+    div.className = `trade-row ${isPlayer ? 'player-trade' : ''}`;
+    div.innerHTML = `
       <span class="trade-price" style="color:${isPlayer?'var(--gold)':'var(--text)'}">${formatPrice(t.price)}</span>
       <span class="trade-qty">×${t.qty}</span>
       <span class="trade-parties">${shortName(t.buyer_name)} ← ${shortName(t.seller_name)}</span>
-      <span class="trade-time">${ts}</span>
-    </div>`;
-  }).join('');
-  tape.innerHTML = html;
+      <span class="trade-time">${ts}</span>`;
+    tape.insertBefore(div, tape.firstChild); // newest at top
+  });
+
+  // Trim old rows beyond 50
+  while (tape.children.length > 50) tape.removeChild(tape.lastChild);
 }
 
 function renderPositions(players) {
